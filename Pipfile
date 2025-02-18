@@ -3,6 +3,13 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[scripts]
+format = "black"
+lint = "flake8"
+typecheck = "mypy"
+tests = "pytest --cov --cov-fail-under=100"
+all = "black && isort && flake8 && mypy && pytest --cov --cov-fail-under=100"
+
 [packages]
 beeware = "*"
 
