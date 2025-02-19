@@ -3,9 +3,9 @@ from datetime import datetime
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, CENTER, JUSTIFY
+from toga.colors import GRAY, BLUE
 
 from .db_manager import DataManager
-from .progress_canvas import ProgressCanvas
 
 
 class TrainingApp(toga.App):
@@ -15,6 +15,8 @@ class TrainingApp(toga.App):
 
         self.main_window = toga.MainWindow(title=self.formal_name, on_close=self.destroy)
         self.main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
+
+        self.canvas = toga.Canvas(style=Pack(flex=1), on_resize=self.on_resize)
 
         self.main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
         self.date_picker = toga.DateInput(
@@ -74,6 +76,7 @@ class TrainingApp(toga.App):
         for row in logs:
             # Expected row format: (id, exercise_id, training_date, sets, reps, total, units, weight, exercise_name)
             id = row[0]
+            exercise_id = row[1]
             sets_val = row[3]
             reps_json = row[4]
             total_val = row[5]
@@ -100,7 +103,7 @@ class TrainingApp(toga.App):
                         min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
             self.logs_box.add(toga.Label("kg"))
             self.logs_box.add(toga.Button("-", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
-            self.logs_box.add(toga.Button("Progress", on_press=self.show_progress, id=f"{id}_progress"))
+            self.logs_box.add(toga.Button("Progress", on_press=self.show_progress, id=f"{exercise_id}_progress"))
 
     def refresh_day_view(self, widget):
         for child in list(self.day_box.children):
@@ -338,17 +341,72 @@ class TrainingApp(toga.App):
     def show_progress(self, widget):
         """Displays the chart in a new window"""
         data = self.data_manager.fetch_exercise_totals_over_time(int(widget.id.split("_")[0]))
-        dates, totals = zip(*data)
-
-        canvas = ProgressCanvas(list(dates), list(totals), style=Pack(flex=1))
-
+        totals, dates = zip(*data)
+    
+        self.draw_chart(list(totals), list(dates))
         # Create new box with back button
         canvas_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
-        canvas_box.add(canvas)
+        canvas_box.add(self.canvas)
         back_btn = toga.Button("Go Back", on_press=self.show_main_content, style=Pack(padding=10))
         canvas_box.add(back_btn)
 
         self.show_content(canvas_box)
+
+    def draw_chart(self, x_data, y_data):
+        """Draws a smooth line chart with dots"""
+
+        context = self.canvas.context
+        width, height = self.main_window.size
+        margin_x = int(width / len(y_data))
+        margin_y = int(height / len(x_data))
+
+        # Get min/max values for scaling
+        max_total = max(x_data) if x_data else 1
+        min_total = min(x_data) if x_data else 0
+        total_range = max_total - min_total or 1
+
+        # Draw vertical grid lines
+        context.line_width = 1
+        
+        for i in range(len(y_data)):
+            context.move_to(i*margin_x, 0)
+            context.line_to(i*margin_x, height)
+            context.stroke(color=GRAY)
+
+        # Draw horizontal grid lines
+        for j in range(5):
+            y = margin_y + j * (height / 5)
+            context.move_to(margin_x, y)
+            context.line_to(width - margin_x, y)
+            context.stroke(color=GRAY)
+
+        # Draw X & Y axis
+        context.line_width = 2
+        context.move_to(margin_x, margin_y)
+        context.line_to(margin_x, height - margin_y)  # Y-axis
+        context.line_to(width - margin_x, height - margin_y)  # X-axis
+        context.stroke(color="black")
+        '''
+        # Draw the line chart
+        context.stroke_color = BLUE
+        context.line_width = 3
+        context.move_to(scale_x(0), scale_y(self.x_data[0]))
+
+        for i in range(1, len(self.x_data)):
+            context.line_to(scale_x(i), scale_y(self.x_data[i]))
+
+        context.stroke_path()
+
+        # Draw points
+        for i in range(len(self.x_data)):
+            x, y = scale_x(i), scale_y(self.x_data[i])
+            context.arc(x, y, 5, 0, 360)
+            context.fill_color = BLUE
+            context.fill_path()
+        '''
+    
+    def on_resize(self, widget):
+        pass
 
 
 def main():
