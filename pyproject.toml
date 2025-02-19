@@ -1,0 +1,29 @@
+[project]
+name = "training_tracker"
+version = "0.1.0"
+description = "A cross-platform training tracking app using BeeWare Toga."
+authors = [
+    { name = "Dragomir Georgiev", email = "" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "toga",
+    "briefcase",
+    "sqlite3",
+    "json",
+    "logging",
+    "datetime"
+]
+
+[tool.briefcase]
+project_name = "TrainingTracker"
+bundle = "org.example"
+
+[tool.briefcase.app.training_tracker]
+formal_name = "Training Tracker"
+bundle = "org.example.trainingtracker"
+version = "0.1.0"
+description = "A cross-platform training tracking app using BeeWare Toga."
+sources = ["src"]
+app_module = "src.__main__"
