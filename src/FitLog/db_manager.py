@@ -44,11 +44,10 @@ class DataManager:
         
         self._cursor.execute(
             """
-            SELECT l.total, l.training_date
-            FROM exercise_log l
-            JOIN exercises e ON l.exercise_id = e.id
-            WHERE e.id = ?
-            ORDER BY l.training_date
+            SELECT total, training_date
+            FROM exercise_log
+            WHERE exercise_id = ?
+            ORDER BY training_date
             """,
             (exercise_id,),
         )
