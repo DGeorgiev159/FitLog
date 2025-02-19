@@ -13,20 +13,26 @@ class TrainingApp(toga.App):
         self.data_manager = DataManager()  # Initialize the DB connection
 
         self.main_window = toga.MainWindow(title=self.formal_name)
-        main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
+        self.main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
-        main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
+        self.main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
         self.date_picker = toga.DateInput(
             value=datetime.now(), style=Pack(padding_bottom=10, width=200), on_change=self.refresh_day_view
         )
-        main_box.add(self.date_picker)
+        self.main_box.add(self.date_picker)
 
         # open the daily log view for the chosen date
         self.open_day_view()
-        main_box.add(self.day_box)
+        self.main_box.add(self.day_box)
 
-        self.main_window.content = main_box
+        self.show_main_content()
+
+    def show_content(self, box):
+        self.main_window.content = box
         self.main_window.show()
+
+    def show_main_content(self, w=None):
+        self.show_content(self.main_box)
 
     def open_day_view(self):
         """Shows today's log and a button to add an exercise."""
@@ -85,7 +91,7 @@ class TrainingApp(toga.App):
             self.logs_box.add(toga.TextInput(style=Pack(padding_right=5),
                         on_change=self.save_exercise_reps, value=str(reps_list), id=f"{id}_reps"))
             self.logs_box.add(toga.Label(f"Units: {units_val}",style=Pack(padding_right=5)))
-            self.logs_box.add(toga.Label(f"total: {total_val} | weight ", style=Pack(padding_right=5)))
+            self.logs_box.add(toga.Label(f"total: {total_val:.2f} | weight ", style=Pack(padding_right=5)))
             self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
                         min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
             self.logs_box.add(toga.Label("kg"))
@@ -101,7 +107,6 @@ class TrainingApp(toga.App):
 
     def open_category_selection(self, widget):
         """Opens a window with buttons for each exercise category."""
-        self.category_window = toga.Window(title="Select Category")
         cat_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         categories = [c[0] for c in self.data_manager.fetch_categories()]
@@ -117,15 +122,18 @@ class TrainingApp(toga.App):
         add_cat_btn = toga.Button(
             "Add Category", on_press=self.open_add_category, style=Pack(padding=5)
         )
+        back_btn = toga.Button(
+            "Go Back", on_press=self.show_main_content, style=Pack(padding=5)
+        )
         cat_box.add(add_cat_btn)
+        cat_box.add(back_btn)
 
-        self.category_window.content = cat_box
-        self.windows.add(self.category_window)
-        self.category_window.show()
+        self.main_window.content = cat_box
+        self.main_window.show()
 
     def open_add_category(self, widget):
         """Opens a window to input a new category name."""
-        self.add_category_window = toga.Window(title="Add New Category")
+        #self.add_category_window = toga.Window(title="Add New Category")
         box = toga.Box(style=Pack(direction=COLUMN, padding=10))
         box.add(toga.Label("New Category Name:", style=Pack(padding_bottom=5)))
         self.new_category_input = toga.TextInput(placeholder="Category name")
@@ -133,30 +141,27 @@ class TrainingApp(toga.App):
         save_btn = toga.Button(
             "Save Category", on_press=self.save_new_category, style=Pack(padding=5)
         )
+        back_btn = toga.Button(
+            "Go Back", on_press=self.open_category_selection, style=Pack(padding=5)
+        )
         box.add(save_btn)
-        self.add_category_window.content = box
-        self.windows.add(self.add_category_window)
-        self.add_category_window.show()
+        box.add(back_btn)
+        
+        self.show_content(box)
 
     def save_new_category(self, widget):
         """Saves the new category to the database and refreshes the category list."""
         new_cat = self.new_category_input.value.strip()
         if new_cat:
             self.data_manager.add_exercise_category(new_cat)
-            self.add_category_window.close()
-            # Reopen the category selection to reflect the new category
-            if hasattr(self, "category_window"):
-                self.category_window.close()
             self.open_category_selection(None)
 
     # --- EXERCISE SELECTION FLOW ---
 
     def open_exercise_selection(self, category):
         """Closes the category window and opens a window listing exercises for the selected category."""
-        if hasattr(self, "category_window"):
-            self.category_window.close()
         self.selected_category = category
-        self.exercise_window = toga.Window(title=f"Select Exercise ({category})")
+        #self.exercise_window = toga.Window(title=f"Select Exercise ({category})")
         ex_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         exercises = [e[0] for e in self.data_manager.fetch_exercises(category)]
@@ -172,15 +177,20 @@ class TrainingApp(toga.App):
         add_ex_btn = toga.Button(
             "Add Exercise", on_press=self.open_add_exercise, style=Pack(padding=5)
         )
+        back_btn = toga.Button(
+            "Go Back", on_press=self.open_category_selection, style=Pack(padding=5)
+        )
         ex_box.add(add_ex_btn)
+        ex_box.add(back_btn)
 
-        self.exercise_window.content = ex_box
-        self.windows.add(self.exercise_window)
-        self.exercise_window.show()
+        self.show_content(ex_box)
+    
+    def open_exercise_selection_handle(self, w):
+        self.open_exercise_selection(self.selected_category)
 
     def open_add_exercise(self, widget):
         """Opens a window to add a new exercise to the selected category."""
-        self.add_exercise_window = toga.Window(title="Add New Exercise")
+        #self.add_exercise_window = toga.Window(title="Add New Exercise")
         box = toga.Box(style=Pack(direction=COLUMN, padding=10))
         box.add(toga.Label("New Exercise Name:", style=Pack(padding_bottom=5)))
         self.new_exercise_input = toga.TextInput(placeholder="Exercise name")
@@ -188,29 +198,27 @@ class TrainingApp(toga.App):
         save_btn = toga.Button(
             "Save Exercise", on_press=self.save_new_exercise, style=Pack(padding=5)
         )
+        back_btn = toga.Button(
+            "Go Back", on_press=self.open_exercise_selection_handle, style=Pack(padding=5)
+        )
         box.add(save_btn)
-        self.add_exercise_window.content = box
-        self.windows.add(self.add_exercise_window)
-        self.add_exercise_window.show()
+        box.add(back_btn)
+
+        self.show_content(box)
 
     def save_new_exercise(self, widget):
         """Saves the new exercise to the database and refreshes the exercise list."""
         new_ex = self.new_exercise_input.value.strip()
         if new_ex:
             self.data_manager.add_exercise(self.selected_category, new_ex)
-            self.add_exercise_window.close()
-            if hasattr(self, "exercise_window"):
-                self.exercise_window.close()
             self.open_exercise_selection(self.selected_category)
 
     # --- EXERCISE DETAIL (LOG ENTRY) ---
 
     def open_exercise_detail(self, exercise):
         """Closes the exercise selection window and opens a detail window for logging."""
-        if hasattr(self, "exercise_window"):
-            self.exercise_window.close()
         self.selected_exercise = exercise
-        self.detail_window = toga.Window(title=f"Log Details: {exercise}")
+        #self.detail_window = toga.Window(title=f"Log Details: {exercise}")
         box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         # Display the selected exercise name
@@ -251,11 +259,17 @@ class TrainingApp(toga.App):
         save_btn = toga.Button(
             "Save Log", on_press=self.save_exercise_log_detail, style=Pack(padding=5)
         )
+        back_btn = toga.Button(
+            "Go Back", on_press=self.open_exercise_selection_handle, style=Pack(padding=5)
+        )
+        home_btn = toga.Button(
+            "Home", on_press=self.show_main_content, style=Pack(padding=5)
+        )
         box.add(save_btn)
+        box.add(back_btn)
+        box.add(home_btn)
 
-        self.detail_window.content = box
-        self.windows.add(self.detail_window)
-        self.detail_window.show()
+        self.show_content(box)
 
     def save_exercise_sets(self, widget):
         id = widget.id.split("_")[0]
@@ -306,7 +320,7 @@ class TrainingApp(toga.App):
         )
 
         # Close the detail window and refresh the day view logs
-        self.detail_window.close()
+        self.show_main_content()
         self.refresh_day_logs()
 
 
