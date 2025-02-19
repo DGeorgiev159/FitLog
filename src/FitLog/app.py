@@ -98,7 +98,7 @@ class TrainingApp(toga.App):
             self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
                         min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
             self.logs_box.add(toga.Label("kg"))
-            self.logs_box.add(toga.Button("Remove", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
+            self.logs_box.add(toga.Button("-", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
 
     def refresh_day_view(self, widget):
         for child in list(self.day_box.children):
