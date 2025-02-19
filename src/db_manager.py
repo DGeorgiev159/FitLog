@@ -19,7 +19,7 @@ class DataManager:
             '''SELECT e.name 
             FROM exercises e
             JOIN exercise_category ec ON e.category_id=ec.id 
-            WHERE name=?''', (category,))
+            WHERE ec.name=?''', (category,))
 
         return self._cursor.fetchall()
 
