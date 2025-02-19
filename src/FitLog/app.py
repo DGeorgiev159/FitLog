@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 import toga
 from toga.style import Pack
-from toga.style.pack import COLUMN, ROW
+from toga.style.pack import COLUMN, ROW, CENTER, JUSTIFY
 
 from .db_manager import DataManager
 
@@ -16,31 +16,28 @@ class TrainingApp(toga.App):
         main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
-        self.date_picker = toga.DatePicker(
-            value=datetime.now(), style=Pack(padding_bottom=10, width=200)
+        self.date_picker = toga.DateInput(
+            value=datetime.now(), style=Pack(padding_bottom=10, width=200), on_change=self.refresh_day_view
         )
         main_box.add(self.date_picker)
 
-        # Button to open the daily log view for the chosen date
-        open_day_view_btn = toga.Button(
-            "Open Day View", on_press=self.open_day_view, style=Pack(padding=5)
-        )
-        main_box.add(open_day_view_btn)
+        # open the daily log view for the chosen date
+        self.open_day_view()
+        main_box.add(self.day_box)
 
         self.main_window.content = main_box
         self.main_window.show()
 
-    def open_day_view(self, widget):
-        """Opens a window that shows today's log and a button to add an exercise."""
-        self.current_day_date = self.date_picker.value
-        self.day_window = toga.Window(title=self.current_day_date.strftime("%Y-%m-%d"))
+    def open_day_view(self):
+        """Shows today's log and a button to add an exercise."""
         self.day_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         # Title label for the day view
         self.day_box.add(
             toga.Label(
-                f"Daily Log for {self.current_day_date.strftime('%Y-%m-%d')}",
+                f"Daily Log for {self.date_picker.value.strftime('%Y-%m-%d')}",
                 style=Pack(font_size=18, padding_bottom=10),
+                id="header"
             )
         )
 
@@ -51,15 +48,11 @@ class TrainingApp(toga.App):
         self.day_box.add(add_exercise_btn)
 
         # Box to list log entries for the day
-        self.logs_box = toga.Box(style=Pack(direction=COLUMN, padding_top=10))
+        self.logs_box = toga.Box(style=Pack(direction=ROW, padding_top=10, alignment=CENTER))
         self.day_box.add(toga.Label("Today's Logs:", style=Pack(padding_top=10)))
         self.day_box.add(self.logs_box)
 
         self.refresh_day_logs()
-
-        self.day_window.content = self.day_box
-        self.windows.add(self.day_window)
-        self.day_window.show()
 
     def refresh_day_logs(self):
         """Fetch log entries for the current day and display them."""
@@ -67,10 +60,10 @@ class TrainingApp(toga.App):
         for child in list(self.logs_box.children):
             self.logs_box.remove(child)
 
-        logs = self.data_manager.fetch_day_log(self.current_day_date)
+        logs = self.data_manager.fetch_day_log(self.date_picker.value)
         for row in logs:
             # Expected row format: (id, exercise_id, training_date, sets, reps, total, units, weight, exercise_name)
-            log_id = row[0]
+            id = row[0]
             sets_val = row[3]
             reps_json = row[4]
             total_val = row[5]
@@ -80,12 +73,29 @@ class TrainingApp(toga.App):
             try:
                 reps_list = json.loads(reps_json)
             except json.JSONDecodeError:
-                reps_list = []
-            log_text = (
-                f"ID:{log_id} | {exercise_name} | Sets: {sets_val}, "
-                f"Reps: {reps_list}, Total: {total_val}, Weight: {weight_val}, Units: {units_val}"
-            )
-            self.logs_box.add(toga.Label(log_text))
+                reps_list = [0]
+
+            if units_val == 'seconds':
+                total_val /= 60
+
+            self.logs_box.add(toga.Label(f"{exercise_name}: sets ", id=f"{id}", style=Pack(padding_right=5)))
+            self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
+                        min=0, max=20, on_change=self.save_exercise_sets, value=sets_val, id=f"{id}_sets"))
+            self.logs_box.add(toga.Label("reps ", style=Pack(padding_right=5),))
+            self.logs_box.add(toga.TextInput(style=Pack(padding_right=5),
+                        on_change=self.save_exercise_reps, value=str(reps_list), id=f"{id}_reps"))
+            self.logs_box.add(toga.Label(f"Units: {units_val}",style=Pack(padding_right=5)))
+            self.logs_box.add(toga.Label(f"total: {total_val} | weight ", style=Pack(padding_right=5)))
+            self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
+                        min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
+            self.logs_box.add(toga.Label("kg"))
+
+    def refresh_day_view(self, widget):
+        for child in list(self.day_box.children):
+            if child.id == "header":
+                child.text = f"Daily Log for {self.date_picker.value.strftime('%Y-%m-%d')}"
+        
+        self.refresh_day_logs()
 
     # --- CATEGORY SELECTION FLOW ---
 
@@ -228,7 +238,7 @@ class TrainingApp(toga.App):
 
         row.add(toga.Label("Units:", style=Pack(padding_right=5)))
         self.detail_units_selection = toga.Selection(
-            items=["quantity", "kg", "lbs", "seconds"], style=Pack(width=100)
+            items=["quantity", "seconds"], style=Pack(width=100)
         )
         row.add(self.detail_units_selection)
         box.add(row)
@@ -246,6 +256,22 @@ class TrainingApp(toga.App):
         self.detail_window.content = box
         self.windows.add(self.detail_window)
         self.detail_window.show()
+
+    def save_exercise_sets(self, widget):
+        id = widget.id.split("_")[0]
+        if widget.value:
+            self.data_manager.set_sets(id, int(widget.value))
+
+    def save_exercise_reps(self, widget):
+        id = widget.id.split("_")[0]
+        reps_list = [int(num.strip()) for num in widget.value.strip("[]").split(",") if num.strip().isdigit()]
+        if reps_list:
+            self.data_manager.set_reps(id, reps_list)
+
+    def save_exercise_weight(self, widget):
+        id = widget.id.split("_")[0]
+        if widget.value:
+            self.data_manager.set_weight(id, float(widget.value))
 
     def save_exercise_log_detail(self, widget):
         """Reads the input from the detail window, adds the log entry to the database, and refreshes the day view."""
@@ -276,7 +302,7 @@ class TrainingApp(toga.App):
             reps=reps_list,
             weight=weight_val,
             units=units_val,
-            date=self.current_day_date,
+            date=self.date_picker.value,
         )
 
         # Close the detail window and refresh the day view logs
