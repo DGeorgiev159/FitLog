@@ -11,7 +11,8 @@ tests = "pytest --cov --cov-fail-under=100"
 all = "black && isort && flake8 && mypy && pytest --cov --cov-fail-under=100"
 
 [packages]
-beeware = "*"
+briefcase = "*"
+toga = "*"
 
 [dev-packages]
 black = "*"
