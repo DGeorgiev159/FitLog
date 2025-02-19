@@ -39,6 +39,20 @@ class DataManager:
             (training_date,),
         )
         return self._cursor.fetchall()
+    
+    def fetch_exercise_totals_over_time(self, exercise_id: int):
+        
+        self._cursor.execute(
+            """
+            SELECT l.total, l.training_date
+            FROM exercise_log l
+            JOIN exercises e ON l.exercise_id = e.id
+            WHERE e.id = ?
+            ORDER BY l.training_date
+            """,
+            (exercise_id,),
+        )
+        return self._cursor.fetchall()
 
     def add_exercise_category(self, category: str):
 

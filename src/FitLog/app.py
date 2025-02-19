@@ -5,6 +5,7 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, CENTER, JUSTIFY
 
 from .db_manager import DataManager
+from .progress_canvas import ProgressCanvas
 
 
 class TrainingApp(toga.App):
@@ -99,6 +100,7 @@ class TrainingApp(toga.App):
                         min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
             self.logs_box.add(toga.Label("kg"))
             self.logs_box.add(toga.Button("-", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
+            self.logs_box.add(toga.Button("Progress", on_press=self.show_progress, id=f"{id}_progress"))
 
     def refresh_day_view(self, widget):
         for child in list(self.day_box.children):
@@ -330,6 +332,23 @@ class TrainingApp(toga.App):
         # Close the detail window and refresh the day view logs
         self.show_main_content()
         self.refresh_day_logs()
+
+    # --- CANVAS (DATA DISPLAY) ---
+
+    def show_progress(self, widget):
+        """Displays the chart in a new window"""
+        data = self.data_manager.fetch_exercise_totals_over_time(int(widget.id.split("_")[0]))
+        dates, totals = zip(*data)
+
+        canvas = ProgressCanvas(list(dates), list(totals), style=Pack(flex=1))
+
+        # Create new box with back button
+        canvas_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
+        canvas_box.add(canvas)
+        back_btn = toga.Button("Go Back", on_press=self.show_main_content, style=Pack(padding=10))
+        canvas_box.add(back_btn)
+
+        self.show_content(canvas_box)
 
 
 def main():
