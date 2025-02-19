@@ -12,7 +12,7 @@ class TrainingApp(toga.App):
         """Main entry point: show a window with a DatePicker to choose the day."""
         self.data_manager = DataManager()  # Initialize the DB connection
 
-        self.main_window = toga.MainWindow(title=self.formal_name)
+        self.main_window = toga.MainWindow(title=self.formal_name, on_close=self.destroy)
         self.main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
         self.main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
@@ -26,6 +26,9 @@ class TrainingApp(toga.App):
         self.main_box.add(self.day_box)
 
         self.show_main_content()
+
+    def destroy(self, w):
+        self.data_manager.destroy()
 
     def show_content(self, box):
         self.main_window.content = box
