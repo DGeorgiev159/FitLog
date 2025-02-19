@@ -1,0 +1,194 @@
+import sqlite3
+import logging
+from datetime import datetime
+import json
+
+class DataManager:
+
+    def __init__(self, db_path: str = 'training_data.sqlite'):
+        self._logger = logging.getLogger(__name__)
+        self._connect_to_database(db_path)
+
+    def add_exercise_category(self, category: str):
+
+        self._cursor.execute('INSERT OR IGNORE INTO exercise_category (name) VALUES (?);',
+                                (category))
+        self._connection.commit()
+
+    def delete_exercise_category(self, category: str):
+        self._cursor.execute('DELETE FROM exercise_category WHERE name=?;',
+                             (category))
+        self._connection.commit()
+
+    def add_exercise_variation(self, category:str, variation: str):
+        self.add_exercise_category(category)
+        self._cursor.execute('''
+            INSERT OR IGNORE INTO exercises (name, category_id) 
+            VALUES (?, (SELECT id FROM exercise_category WHERE name = ?));
+            ''', (variation, category))
+        self._connection.commit()
+
+    def delete_exercise_variation(self, category:str, variation: str):
+        self._cursor.execute('''
+            DELETE FROM exercises WHERE name=?,
+            (SELECT id FROM exercise_category WHERE name=?);''',
+            (variation, category))
+        self._connection.commit()
+
+    def add_exercise_log(self, exercise: str, sets:int=0, reps:list[int]=[], units:str='quantity', date: datetime | None=None):
+        if date is None:
+            date = datetime.now()
+        training_date = date.isoformat()
+        total = sum(reps)
+        json_reps = json.dumps(reps)
+        
+        self._cursor.execute('''
+            INSERT INTO exercise_logs (exercise_id, training_date, sets, reps, total, units)
+            VALUES (
+            (SELECT id FROM exercises WHERE name = ?),
+            ?, ?, ?, ?, ?);''',
+            (exercise, training_date, sets, json_reps, total, units))
+        self._connection.commit()        
+
+    def delete_exercise_log(self, id: int):
+        self._cursor.execute('DELETE FROM exercise_log WHERE id=?;', (id))
+        self._connection.commit()
+
+    def set_date(self, id:int, date:datetime|None = None):
+        if date is None:
+            date = datetime.now()
+        training_date = date.isoformat()
+        
+        self._cursor.execute('UPDATE exercise_log SET training_date=? WHERE id=?);',
+                             (training_date, id))
+        self._connection.commit()
+
+    def set_sets(self, id:int, sets: int):
+        self._cursor.execute('UPDATE exercise_log SET sets=? WHERE id=?);',
+                             (sets, id))
+        self._connection.commit()
+
+    def set_weight(self, id:int, weight: int):
+        self._cursor.execute('UPDATE exercise_log SET weight=? WHERE id=?);',
+                             (weight, id))
+        self._connection.commit()
+
+    def set_reps(self, id:int, reps: list[int]):
+        json_reps = json.dumps(reps)
+        total = sum(reps)
+        self._cursor.execute('UPDATE exercise_log SET reps=?, total=? WHERE id=?);',
+                             (json_reps, total, id))
+        self._connection.commit()
+
+    def set_units(self, id:int, units:str='quantity'):
+        self._cursor.execute('UPDATE exercise_log SET units=? WHERE id=?);',
+                             (units, id))
+        self._connection.commit()
+
+    def set_data(self, id:int, sets:int, reps:list[int], date:datetime|None = None):
+        self.set_sets(id, sets)
+        self.set_reps(id, reps)
+        self.set_date(id, date)
+
+    def destroy(self):
+        if self._connection:
+            self._connection.close()
+
+    def _connect_to_database(self, db_path):
+        try:
+            self._connection  = sqlite3.connect(db_path)
+            self._cursor = self._connection.cursor()
+        except sqlite3.Error as e:
+            self._logger.critical(e)
+
+        # check if database is empty
+        self._cursor.execute('SELECT name FROM sqlite_master')
+        if not self._cursor.fetchall():
+            self._load_default_data()
+        
+    def _load_default_data(self):
+        pass
+
+    def _load_tables(self):
+        self._cursor.executescript('''
+            CREATE TABLE IF NOT EXISTS exercise_category (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            );
+            
+            CREATE TABLE IF NOT EXISTS exercises (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category_id INTEGER NOT NULL,
+                FOREIGN KEY (category_id) REFERENCES exercise_category(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS exercise_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                exercise_id INTEGER NOT NULL,
+                training_date TEXT NOT NULL,
+                sets INTEGER NOT NULL,
+                reps TEXT,
+                total INTEGER,
+                units TEXT,
+                weight INTEGER,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+            );
+        ''')
+        self._connection.commit()
+
+    def _load_exercises(self):
+        default_data = {
+            "Push": [
+                "Push-ups",
+                "Declined push-ups",
+                "Elevated pike push-ups",
+                "One arm inclined push-ups"
+            ],
+            "Pull": [
+                "Chin-ups",
+                "Pull-ups",
+                "One arm hold"
+            ],
+            "Legs": [
+                "Squats",
+                "Bulgarian squats",
+                "One leg squats"
+            ],
+            "Core": [
+                "Plank",
+                "Dragon-flag",
+                "Hollow body hold"
+            ],
+            "Dips": [
+                "Dips",
+                "Single bar dips"
+            ],
+            "Inversions": [
+                "Headstand",
+                "Headstand advanced"
+            ],
+            "Handstand": [
+                "Handstand",
+                "Handstand push-ups",
+                "Tuck handstand",
+                "Straddle handstand",
+                "One arm handstand",
+                "Wall handstand shoulder taps"
+            ],
+            "Lever": [
+                "Tuck front lever rises",
+                "Advance tuck front lever rises",
+                "Straddle lever rises",
+                "Frond lever rises",
+                "Tuck front lever hold",
+                "Advance tuck front lever hold",
+                "Straddle front lever hold",
+                "Front lever hold"
+            ]
+        }
+
+        for category, variations in default_data.items():
+            for variation in variations:
+                self.add_exercise_variation(category, variation)
+        self._connection.commit()
