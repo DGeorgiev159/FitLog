@@ -9,36 +9,61 @@ class DataManager:
         self._logger = logging.getLogger(__name__)
         self._connect_to_database(db_path)
 
+    def fetch_categories(self) -> list[str]:
+        self._cursor.execute('''SELECT name FROM exercise_category''')
+
+        return self._cursor.fetchall()
+
+    def fetch_exercises(self, category: str):
+        self._cursor.execute(
+            '''SELECT e.name 
+            FROM exercises e
+            JOIN exercise_category ec ON e.category_id=ec.id 
+            WHERE name=?''', (category,))
+
+        return self._cursor.fetchall()
+
+    def fetch_day_log(self, date: datetime|None=None):
+        training_date = self._convert_date_to_iso(date)
+
+        self._cursor.execute(
+            '''
+            SELECT l.*, e.name as exercise_name
+            FROM exercise_logs l
+            JOIN exercises e ON l.exercise_id = e.id
+            WHERE training_date = ?
+            ''', (training_date,)
+            )
+        return self._cursor.fetchall()
+
     def add_exercise_category(self, category: str):
 
         self._cursor.execute('INSERT OR IGNORE INTO exercise_category (name) VALUES (?);',
-                                (category))
+                                (category,))
         self._connection.commit()
 
     def delete_exercise_category(self, category: str):
         self._cursor.execute('DELETE FROM exercise_category WHERE name=?;',
-                             (category))
+                             (category,))
         self._connection.commit()
 
-    def add_exercise_variation(self, category:str, variation: str):
+    def add_exercise(self, category:str, exercise: str):
         self.add_exercise_category(category)
         self._cursor.execute('''
             INSERT OR IGNORE INTO exercises (name, category_id) 
             VALUES (?, (SELECT id FROM exercise_category WHERE name = ?));
-            ''', (variation, category))
+            ''', (exercise, category))
         self._connection.commit()
 
-    def delete_exercise_variation(self, category:str, variation: str):
+    def delete_exercise(self, category:str, exercise: str):
         self._cursor.execute('''
             DELETE FROM exercises WHERE name=?,
             (SELECT id FROM exercise_category WHERE name=?);''',
-            (variation, category))
+            (exercise, category))
         self._connection.commit()
 
     def add_exercise_log(self, exercise: str, sets:int=0, reps:list[int]=[], units:str='quantity', date: datetime | None=None):
-        if date is None:
-            date = datetime.now()
-        training_date = date.isoformat()
+        training_date = self._convert_date_to_iso(date)
         total = sum(reps)
         json_reps = json.dumps(reps)
         
@@ -55,10 +80,7 @@ class DataManager:
         self._connection.commit()
 
     def set_date(self, id:int, date:datetime|None = None):
-        if date is None:
-            date = datetime.now()
-        training_date = date.isoformat()
-        
+        training_date = self._convert_date_to_iso(date)
         self._cursor.execute('UPDATE exercise_log SET training_date=? WHERE id=?);',
                              (training_date, id))
         self._connection.commit()
@@ -94,6 +116,11 @@ class DataManager:
         if self._connection:
             self._connection.close()
 
+    def _convert_date_to_iso(self, date: datetime|None):
+        if date is None:
+            date = datetime.now()
+        return date.isoformat()
+
     def _connect_to_database(self, db_path):
         try:
             self._connection  = sqlite3.connect(db_path)
@@ -107,7 +134,8 @@ class DataManager:
             self._load_default_data()
         
     def _load_default_data(self):
-        pass
+        self._load_tables()
+        self._load_exercises()
 
     def _load_tables(self):
         self._cursor.executescript('''
@@ -188,7 +216,7 @@ class DataManager:
             ]
         }
 
-        for category, variations in default_data.items():
-            for variation in variations:
-                self.add_exercise_variation(category, variation)
+        for category, exercises in default_data.items():
+            for exercise in exercises:
+                self.add_exercise(category, exercise)
         self._connection.commit()
