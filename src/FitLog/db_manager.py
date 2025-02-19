@@ -185,7 +185,7 @@ class DataManager:
                 reps TEXT,
                 total INTEGER,
                 units TEXT,
-                weight INTEGER,
+                weight REAL,
                 FOREIGN KEY (exercise_id) REFERENCES exercises(id)
             );
         """
