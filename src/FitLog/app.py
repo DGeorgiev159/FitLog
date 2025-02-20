@@ -9,9 +9,17 @@ from .db_manager import DataManager
 
 
 class TrainingApp(toga.App):
+
+    DARK_BACKGROUND = "#121212"
+    DARK_FOREGROUND = "#e0e0e0"
+    ACCENT_COLOR = "#9160c9"
+    BUTTON_BACKGROUND = "#1f1f1f"
+    BUTTON_TEXT_COLOR = "#ffffff"
+
     def startup(self):
         """Main entry point: show a window with a DatePicker to choose the day."""
         self.data_manager = DataManager()  # Initialize the DB connection
+        self._load_styles()
 
         self.main_window = toga.MainWindow(title=self.formal_name, on_close=self.destroy)
         self.main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
@@ -422,7 +430,38 @@ class TrainingApp(toga.App):
         for i in range(1, len(y_data)):
             context.line_to(points_coords[i][0], points_coords[i][1])
             
-        context.stroke(color=BLUE)       
+        context.stroke(color=BLUE)
+
+    def _load_styles(self):
+         # Define a style for the main container (Box) with a dark background.
+        self.box_style_column = Pack(
+            background_color=self.DARK_BACKGROUND,
+            padding=10,
+            alignment="center",
+            direction=COLUMN
+        )
+        self.box_style_row = Pack(
+            background_color=self.DARK_BACKGROUND,
+            padding=20,
+            alignment="center",
+            direction=ROW
+        )
+        
+        # Create a label with dark theme style.
+        self.label_style = Pack(
+            color=self.DARK_FOREGROUND,
+            background_color=self.DARK_BACKGROUND,
+            font_size=16,
+            padding=10,
+        )
+        
+        # Create a button with a dark background and an accent-colored border.
+        self.button_style = Pack(
+            background_color=self.ACCENT_COLOR,
+            color=self.BUTTON_TEXT_COLOR,
+            padding=10,
+            font_size=14,
+        )
 
 
 def main():
