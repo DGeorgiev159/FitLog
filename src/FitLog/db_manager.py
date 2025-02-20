@@ -87,7 +87,6 @@ class DataManager:
     def add_exercise_log(
         self,
         exercise: str,
-        sets: int = 0,
         reps: list[int] = [],
         units: str = "quantity",
         date: datetime | None = None,
@@ -95,6 +94,7 @@ class DataManager:
     ):
         training_date = self._convert_date_to_iso(date)
         total = sum(reps)
+        sets = int(len(reps))
         json_reps = json.dumps(reps)
 
         self._cursor.execute(
@@ -118,10 +118,6 @@ class DataManager:
         )
         self._connection.commit()
 
-    def set_sets(self, id: int, sets: int):
-        self._cursor.execute("UPDATE exercise_log SET sets=? WHERE id=?;", (sets, id))
-        self._connection.commit()
-
     def set_weight(self, id: int, weight: int):
         self._cursor.execute(
             "UPDATE exercise_log SET weight=? WHERE id=?;", (weight, id)
@@ -131,9 +127,10 @@ class DataManager:
     def set_reps(self, id: int, reps: list[int]):
         json_reps = json.dumps(reps)
         total = sum(reps)
+        sets = int(len(reps))
         self._cursor.execute(
-            "UPDATE exercise_log SET reps=?, total=? WHERE id=?;",
-            (json_reps, total, id),
+            "UPDATE exercise_log SET reps=?, total=?, sets=? WHERE id=?;",
+            (json_reps, total, sets, id),
         )
         self._connection.commit()
 
@@ -144,9 +141,8 @@ class DataManager:
         self._connection.commit()
 
     def set_data(
-        self, id: int, sets: int, reps: list[int], date: datetime | None = None
+        self, id: int, reps: list[int], date: datetime | None = None
     ):
-        self.set_sets(id, sets)
         self.set_reps(id, reps)
         self.set_date(id, date)
 

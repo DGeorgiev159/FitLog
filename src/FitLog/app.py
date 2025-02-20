@@ -68,7 +68,7 @@ class TrainingApp(toga.App):
         self.day_box.add(add_exercise_btn)
 
         # Box to list log entries for the day
-        self.logs_box = toga.Box(style=Pack(direction=ROW, padding_top=10, alignment=CENTER))
+        self.logs_box = toga.Box(style=Pack(direction=ROW, padding_top=10))
         self.day_box.add(toga.Label("Today's Logs:", style=Pack(padding_top=10)))
         self.day_box.add(self.logs_box)
 
@@ -99,18 +99,16 @@ class TrainingApp(toga.App):
             if units_val == 'seconds':
                 total_val /= 60
 
-            self.logs_box.add(toga.Label(f"{exercise_name}: sets ", id=f"{id}", style=Pack(padding_right=5)))
-            self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
-                        min=0, max=20, on_change=self.save_exercise_sets, value=sets_val, id=f"{id}_sets"))
-            self.logs_box.add(toga.Label("reps ", style=Pack(padding_right=5),))
+            self.logs_box.add(toga.Label(f"{exercise_name} > sets: {sets_val} |", id=f"{id}", style=Pack(padding_right=5)))
+            self.logs_box.add(toga.Label("reps: ", style=Pack(padding_right=5),))
             self.logs_box.add(toga.TextInput(style=Pack(padding_right=5),
                         on_change=self.save_exercise_reps, value=str(reps_list), id=f"{id}_reps"))
-            self.logs_box.add(toga.Label(f"Units: {units_val}",style=Pack(padding_right=5)))
-            self.logs_box.add(toga.Label(f"total: {total_val:.2f} | weight ", style=Pack(padding_right=5)))
+            self.logs_box.add(toga.Label(f"| Units: {units_val}",style=Pack(padding_right=5)))
+            self.logs_box.add(toga.Label(f"| total: {total_val:.2f} | weight ", style=Pack(padding_right=5)))
             self.logs_box.add(toga.NumberInput(style=Pack(padding_right=5, width=30),
                         min=0, max=300, on_change=self.save_exercise_weight, value=weight_val, id=f"{id}_weight"))
             self.logs_box.add(toga.Label("kg"))
-            self.logs_box.add(toga.Button("-", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
+            self.logs_box.add(toga.Button(" - ", on_press=self.remove_exercise_from_log, id=f"{id}_remove"))
             self.logs_box.add(toga.Button("Progress", on_press=self.show_progress, id=f"{exercise_id}_progress"))
 
     def refresh_day_view(self, widget):
@@ -245,13 +243,8 @@ class TrainingApp(toga.App):
         # Display the selected exercise name
         box.add(toga.Label(f"Exercise: {exercise}", style=Pack(padding_bottom=10)))
 
-        # Create input fields for sets, reps, weight, and unit selection
+        # Create input fields for reps, weight, and unit selection
         row = toga.Box(style=Pack(direction=ROW, padding_bottom=10))
-        row.add(toga.Label("Sets:", style=Pack(padding_right=5)))
-        self.detail_sets_input = toga.TextInput(
-            placeholder="Sets", style=Pack(width=60, padding_right=10)
-        )
-        row.add(self.detail_sets_input)
 
         row.add(toga.Label("Reps (comma separated):", style=Pack(padding_right=5)))
         self.detail_reps_input = toga.TextInput(
@@ -292,11 +285,6 @@ class TrainingApp(toga.App):
 
         self.show_content(box)
 
-    def save_exercise_sets(self, widget):
-        id = widget.id.split("_")[0]
-        if widget.value:
-            self.data_manager.set_sets(id, int(widget.value))
-
     def save_exercise_reps(self, widget):
         id = widget.id.split("_")[0]
         reps_list = [int(num.strip()) for num in widget.value.strip("[]").split(",") if num.strip().isdigit()]
@@ -310,10 +298,6 @@ class TrainingApp(toga.App):
 
     def save_exercise_log_detail(self, widget):
         """Reads the input from the detail window, adds the log entry to the database, and refreshes the day view."""
-        try:
-            sets_val = int(self.detail_sets_input.value)
-        except ValueError:
-            sets_val = 0
 
         reps_str = self.detail_reps_input.value.strip()
         reps_list = (
@@ -333,7 +317,6 @@ class TrainingApp(toga.App):
         # Save the exercise log using DataManager
         self.data_manager.add_exercise_log(
             exercise=self.selected_exercise,
-            sets=sets_val,
             reps=reps_list,
             weight=weight_val,
             units=units_val,
