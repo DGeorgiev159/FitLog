@@ -108,7 +108,7 @@ class DataManager:
         self._connection.commit()
 
     def delete_exercise_log(self, id: int):
-        self._cursor.execute("DELETE FROM exercise_log WHERE id=?;", (id))
+        self._cursor.execute("DELETE FROM exercise_log WHERE id=?;", (id,))
         self._connection.commit()
 
     def set_date(self, id: int, date: datetime | None = None):
