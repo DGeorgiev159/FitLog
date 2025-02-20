@@ -16,7 +16,7 @@ class TrainingApp(toga.App):
         self.main_window = toga.MainWindow(title=self.formal_name, on_close=self.destroy)
         self.main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
 
-        self.canvas = toga.Canvas(style=Pack(flex=1), on_resize=self.on_resize)
+        self.canvas = toga.Canvas(style=Pack(flex=1))
 
         self.main_box.add(toga.Label("Select Date:", style=Pack(padding_bottom=5)))
         self.date_picker = toga.DateInput(
@@ -343,7 +343,7 @@ class TrainingApp(toga.App):
         data = self.data_manager.fetch_exercise_totals_over_time(int(widget.id.split("_")[0]))
         totals, dates = zip(*data)
     
-        self.draw_chart(list(totals), list(dates))
+        self.draw_chart(list(dates), list(totals))
         # Create new box with back button
         canvas_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
         canvas_box.add(self.canvas)
@@ -352,61 +352,77 @@ class TrainingApp(toga.App):
 
         self.show_content(canvas_box)
 
-    def draw_chart(self, x_data, y_data):
+    def draw_chart(self, x_data, y_data: list[int]):
         """Draws a smooth line chart with dots"""
 
         context = self.canvas.context
         width, height = self.main_window.size
-        margin_x = int(width / len(y_data))
-        margin_y = int(height / len(x_data))
+        c_margin_x = 40
+        c_margin_y_top = 30
+        c_margin_y_bottom = 130
+
+        coords_origin = (c_margin_x, height - c_margin_y_bottom)
+
+        graph_line_x_coords = (width - c_margin_x, height - c_margin_y_bottom)
+        graph_line_y_coords = (c_margin_x, c_margin_y_top)
+        grid_lines = len(x_data)
+
+        # Margin between data points
+        margin_data_x = int((width - 3*c_margin_x) / grid_lines)
+        margin_lines_y = int((height - c_margin_y_top - c_margin_y_bottom)/ 5)
+
+        initial_margin_data_x = c_margin_x + 20
+        initial_margin_data_y = c_margin_y_bottom + 20
 
         # Get min/max values for scaling
-        max_total = max(x_data) if x_data else 1
-        min_total = min(x_data) if x_data else 0
-        total_range = max_total - min_total or 1
+        max_total = max(y_data) + 10
+        min_total = min(y_data) - 5
 
-        # Draw vertical grid lines
-        context.line_width = 1
+
+        # Draw graph lines X & Y axis
+        context.line_width = 2
+        context.move_to(graph_line_x_coords[0], graph_line_x_coords[1])
+        context.line_to(coords_origin[0], coords_origin[1])  # Y-axis
+        context.line_to(graph_line_y_coords[0], graph_line_y_coords[1])  # X-axis
+        context.stroke(color="black")
         
-        for i in range(len(y_data)):
-            context.move_to(i*margin_x, 0)
-            context.line_to(i*margin_x, height)
+        # Draw vertical grid lines
+        x_lines_pos = []
+        context.line_width = 1
+        for i in range(grid_lines):
+            x = i*margin_data_x + initial_margin_data_x
+            context.move_to(x, c_margin_y_top + 10)
+            context.line_to(x, height - c_margin_y_bottom)
             context.stroke(color=GRAY)
+            x_lines_pos.append(x)
 
         # Draw horizontal grid lines
         for j in range(5):
-            y = margin_y + j * (height / 5)
-            context.move_to(margin_x, y)
-            context.line_to(width - margin_x, y)
+            y = c_margin_y_top + j * margin_lines_y + 15
+            context.move_to(c_margin_x, y)
+            context.line_to(width - c_margin_x - 10, y)
             context.stroke(color=GRAY)
 
-        # Draw X & Y axis
-        context.line_width = 2
-        context.move_to(margin_x, margin_y)
-        context.line_to(margin_x, height - margin_y)  # Y-axis
-        context.line_to(width - margin_x, height - margin_y)  # X-axis
-        context.stroke(color="black")
-        '''
-        # Draw the line chart
-        context.stroke_color = BLUE
-        context.line_width = 3
-        context.move_to(scale_x(0), scale_y(self.x_data[0]))
-
-        for i in range(1, len(self.x_data)):
-            context.line_to(scale_x(i), scale_y(self.x_data[i]))
-
-        context.stroke_path()
+        # Bound for data point to be in the graph
+        data_margin_top = c_margin_y_top + 15
+        data_margin_bottom = height - c_margin_y_bottom - 15
 
         # Draw points
-        for i in range(len(self.x_data)):
-            x, y = scale_x(i), scale_y(self.x_data[i])
-            context.arc(x, y, 5, 0, 360)
-            context.fill_color = BLUE
-            context.fill_path()
-        '''
-    
-    def on_resize(self, widget):
-        pass
+        total_range = (max_total - min_total)
+        points_coords = []
+        for i in range(len(y_data)):
+            y = (y_data[i] - min_total) / total_range # 0...1 range
+            y = y*data_margin_bottom + data_margin_top 
+            context.arc(x_lines_pos[i], y, 5, 0, 360)
+            context.fill(color=BLUE)
+            points_coords.append([x_lines_pos[i], y])
+
+        # Draw lines connecting the dots
+        context.move_to(points_coords[0][0], points_coords[0][1])
+        for i in range(1, len(y_data)):
+            context.line_to(points_coords[i][0], points_coords[i][1])
+            
+        context.stroke(color=BLUE)       
 
 
 def main():
