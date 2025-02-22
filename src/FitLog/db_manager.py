@@ -3,8 +3,71 @@ import logging
 from datetime import datetime
 import json
 
+from abc import ABC, abstractmethod
 
-class DataManager:
+
+class AbstractDataManager(ABC):
+    @abstractmethod
+    def fetch_categories(self) -> list[str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_exercise_category(self, category: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_exercise_category(self, category: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def fetch_exercises(self, category: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_exercise(self, category: str, exercise: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_exercise(self, category: str, exercise: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def fetch_day_log(self, date: datetime | None = None):
+        raise NotImplementedError
+
+    @abstractmethod
+    def fetch_exercise_totals_over_time(self, exercise_id: int):
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_exercise_log(
+        self,
+        exercise: str,
+        reps: list[int] = [],
+        units: str = "quantity",
+        date: datetime | None = None,
+        weight: int = 0,
+    ):
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_exercise_log(self, id: int):
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_weight(self, id: int, weight: int):
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_reps(self, id: int, reps: list[int]):
+        raise NotImplementedError
+
+    @abstractmethod
+    def destroy(self):
+        raise NotImplementedError
+
+
+class DataManager(AbstractDataManager):
 
     def __init__(self, db_path: str = "training_data.sqlite"):
         self._logger = logging.getLogger(__name__)
@@ -39,9 +102,9 @@ class DataManager:
             (training_date,),
         )
         return self._cursor.fetchall()
-    
+
     def fetch_exercise_totals_over_time(self, exercise_id: int):
-        
+
         self._cursor.execute(
             """
             SELECT total, training_date
@@ -90,7 +153,7 @@ class DataManager:
         reps: list[int] = [],
         units: str = "quantity",
         date: datetime | None = None,
-        weight: int=0
+        weight: int = 0,
     ):
         training_date = self._convert_date_to_iso(date)
         total = sum(reps)
@@ -135,14 +198,10 @@ class DataManager:
         self._connection.commit()
 
     def set_units(self, id: int, units: str = "quantity"):
-        self._cursor.execute(
-            "UPDATE exercise_log SET units=? WHERE id=?;", (units, id)
-        )
+        self._cursor.execute("UPDATE exercise_log SET units=? WHERE id=?;", (units, id))
         self._connection.commit()
 
-    def set_data(
-        self, id: int, reps: list[int], date: datetime | None = None
-    ):
+    def set_data(self, id: int, reps: list[int], date: datetime | None = None):
         self.set_reps(id, reps)
         self.set_date(id, date)
 
