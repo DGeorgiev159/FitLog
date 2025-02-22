@@ -6,7 +6,7 @@ import json
 from abc import ABC, abstractmethod
 
 
-class AbstractDataManager(ABC):
+class IRepository(ABC):
     @abstractmethod
     def fetch_categories(self) -> list[str]:
         raise NotImplementedError
@@ -67,7 +67,7 @@ class AbstractDataManager(ABC):
         raise NotImplementedError
 
 
-class DataManager(AbstractDataManager):
+class SQLiteRepository(IRepository):
 
     def __init__(self, db_path: str = "training_data.sqlite"):
         self._logger = logging.getLogger(__name__)
