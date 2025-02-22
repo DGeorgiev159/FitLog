@@ -1,10 +1,39 @@
+from dataclasses import dataclass
 import sqlite3
 import logging
 from datetime import datetime
 import json
+from typing import Optional
 
 from abc import ABC, abstractmethod
 
+
+# Models
+
+@dataclass
+class Category:
+    id: Optional[int] = None
+    name: str
+
+@dataclass
+class Exercise:
+    id: Optional[int] = None
+    category_id: Optional[int] = None
+    name: str
+    units: str
+
+@dataclass
+class DataLog:
+    id: Optional[int] = None
+    exercise_id: Optional[int] = None
+    training_date: datetime
+    sets: int
+    reps: str
+    total: int
+    weight: str
+
+
+# Repository
 
 class IRepository(ABC):
     @abstractmethod
