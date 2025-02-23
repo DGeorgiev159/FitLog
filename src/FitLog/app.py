@@ -1,11 +1,10 @@
-import json
 from datetime import datetime
 import toga
 from toga.style import Pack
-from toga.style.pack import COLUMN, ROW, CENTER, JUSTIFY
+from toga.style.pack import COLUMN, ROW
 from toga.colors import GRAY, BLUE
 
-from .db_manager import DataManager
+from .db_manager import SQLiteRepository, Category, Exercise, DataLog
 
 
 class TrainingApp(toga.App):
