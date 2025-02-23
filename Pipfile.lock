@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "fc44ab22bb019371fb444b7c4a457880d3980c2ad47e81991c520b5ecd38b614"
+            "sha256": "53687388e0ce63d235980c2552ca51b49a6328fd7c058574ae6f90af50e302e8"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -627,6 +627,15 @@
             "hashes": [
                 "sha256:91ab9283863cf3b2a837382c3e2173659f05556e6152d6cf3c994205c3e35848",
                 "sha256:e1e212fedb7c4d5c774e1b14adc9f336b6586cbff291de4057632d347a97596b"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.9'",
+            "version": "==0.4.9"
+        },
+        "toga-android": {
+            "hashes": [
+                "sha256:7e5ef9f48a745c681be56579ddad77130a5ab87a290cba712425fc21ea1adfb2",
+                "sha256:b738381b0649c42a3ea4323a5b64b2049f8c19086a1f6ce994b3212641f1f615"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.9'",

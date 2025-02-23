@@ -13,6 +13,7 @@ all = "black . && isort . && flake8 . && mypy . && pytest --cov --cov-fail-under
 [packages]
 briefcase = "*"
 toga = "*"
+toga-android = "*"
 
 [dev-packages]
 black = "*"
