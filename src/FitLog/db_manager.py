@@ -11,87 +11,86 @@ from abc import ABC, abstractmethod
 
 @dataclass
 class Category:
-    id: Optional[int] = None
     name: str
+    id: Optional[int] = None
+
 
 @dataclass
 class Exercise:
+    name: str
     id: Optional[int] = None
     category_id: Optional[int] = None
-    name: str
-    units: str
+    units: str = "-"
+
 
 @dataclass
 class DataLog:
+    reps: str
+    training_date: datetime
+    weight: str
     id: Optional[int] = None
     exercise_id: Optional[int] = None
-    training_date: datetime
-    sets: int
-    reps: str
-    total: int
-    weight: str
+    sets: Optional[int] = None
+    total: Optional[int] = None
+    exercise_name: Optional[str] = None
 
 
 # Repository
 
+
 class IRepository(ABC):
     @abstractmethod
-    def fetch_categories(self) -> list[str]:
+    def fetch_categories(self) -> Generator[Category, None, None]:
         raise NotImplementedError
 
     @abstractmethod
-    def add_exercise_category(self, category: str):
+    def add_exercise_category(self, category: Category) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def delete_exercise_category(self, category: str):
+    def delete_exercise_category(self, category: Category) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_exercises(self, category: str):
+    def fetch_all_exercises(self, category: Category) -> List[str]:
         raise NotImplementedError
 
     @abstractmethod
-    def add_exercise(self, category: str, exercise: str):
+    def add_exercise(self, category: Category, exercise: Exercise) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def delete_exercise(self, category: str, exercise: str):
+    def delete_exercise(self, exercise: Exercise) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_day_log(self, date: datetime | None = None):
+    def fetch_day_log(
+        self, date: Optional[datetime] = None
+    ) -> Generator[DataLog, None, None]:
         raise NotImplementedError
 
     @abstractmethod
-    def fetch_exercise_totals_over_time(self, exercise_id: int):
+    def fetch_exercise_totals_over_time(self, exercise_id: int) -> Tuple[Tuple]:
         raise NotImplementedError
 
     @abstractmethod
-    def add_exercise_log(
-        self,
-        exercise: str,
-        reps: list[int] = [],
-        units: str = "quantity",
-        date: datetime | None = None,
-        weight: int = 0,
-    ):
+    def add_exercise_log(self, data_log: DataLog) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def delete_exercise_log(self, id: int):
+    def delete_exercise_log(self, log_id: int) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def set_weight(self, id: int, weight: int):
+    def set_weight(self, log_id: int, weight: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def set_reps(self, id: int, reps: list[int]):
+    def set_reps(self, log_id: int, reps: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def destroy(self):
+    def destroy(self) -> None:
         raise NotImplementedError
 
 
@@ -101,23 +100,30 @@ class SQLiteRepository(IRepository):
         self._logger = logging.getLogger(__name__)
         self._connect_to_database(db_path)
 
-    def fetch_categories(self) -> list[str]:
+    def fetch_categories(self) -> Generator[Category, None, None]:
         self._cursor.execute("""SELECT name FROM exercise_category""")
 
-        return self._cursor.fetchall()
+        categories = self._cursor.fetchall()
+        for c in categories:
+            yield Category(name=c[0])
 
-    def fetch_exercises(self, category: str):
+    def fetch_all_exercises(
+        self, category: Category
+    ) -> Generator[Exercise, None, None]:
         self._cursor.execute(
             """SELECT e.name
             FROM exercises e
             JOIN exercise_category ec ON e.category_id=ec.id
             WHERE ec.name=?""",
-            (category,),
+            (category.name,),
         )
+        exercises = self._cursor.fetchall()
+        for ex in exercises:
+            yield Exercise(name=ex[0])
 
-        return self._cursor.fetchall()
-
-    def fetch_day_log(self, date: datetime | None = None):
+    def fetch_day_log(
+        self, date: Optional[datetime] = None
+    ) -> Generator[DataLog, None, None]:
         training_date = self._convert_date_to_iso(date)
 
         self._cursor.execute(
@@ -129,10 +135,11 @@ class SQLiteRepository(IRepository):
             """,
             (training_date,),
         )
-        return self._cursor.fetchall()
+        for log in self._map_to_data_log(self._cursor.fetchall()):
+            yield log
 
-    def fetch_exercise_totals_over_time(self, exercise_id: int):
-
+    def fetch_exercise_totals_over_time(self, exercise_id: int) -> Tuple[Tuple]:
+        # TODO: make docstring it returns totals, date (in this order)
         self._cursor.execute(
             """
             SELECT total, training_date
@@ -142,107 +149,147 @@ class SQLiteRepository(IRepository):
             """,
             (exercise_id,),
         )
-        return self._cursor.fetchall()
 
-    def add_exercise_category(self, category: str):
+        return tuple(zip(*self._cursor.fetchall()))
 
-        self._cursor.execute(
-            "INSERT OR IGNORE INTO exercise_category (name) VALUES (?);", (category,)
-        )
-        self._connection.commit()
+    def add_exercise_category(self, category: Category) -> None:
+        try:
+            self._cursor.execute(
+                "INSERT OR IGNORE INTO exercise_category (name) VALUES (?);",
+                (category.name,),
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
 
-    def delete_exercise_category(self, category: str):
-        self._cursor.execute("DELETE FROM exercise_category WHERE name=?;", (category,))
-        self._connection.commit()
+    def delete_exercise_category(self, category: Category) -> None:
+        try:
+            self._cursor.execute(
+                "DELETE FROM exercises WHERE category_id = (SELECT id FROM exercise_category WHERE name = ?);",
+                (category.name,),
+            )
 
-    def add_exercise(self, category: str, exercise: str):
+            self._cursor.execute(
+                "DELETE FROM exercise_category WHERE name=?;", (category.name,)
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
+
+    def add_exercise(self, category: Category, exercise: Exercise) -> None:
         self.add_exercise_category(category)
+        try:
+            self._cursor.execute(
+                """
+                INSERT OR IGNORE INTO exercises (name, category_id, units)
+                VALUES (?, (SELECT id FROM exercise_category WHERE name = ?), ?);
+                """,
+                (exercise.name, category.name, exercise.units),
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
+
+    def delete_exercise(self, exercise: Exercise) -> None:
+        try:
+            self._cursor.execute(
+                """
+                DELETE FROM exercises WHERE name=?
+                """,
+                (exercise.name,),
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
+
+    def add_exercise_log(self, data_log: DataLog) -> None:
+
+        training_date = self._convert_date_to_iso(data_log.training_date)
+        json_reps, total, sets = self._process_reps_data(data_log.reps)
+
         self._cursor.execute(
-            """
-            INSERT OR IGNORE INTO exercises (name, category_id)
-            VALUES (?, (SELECT id FROM exercise_category WHERE name = ?));
-            """,
-            (exercise, category),
+            "SELECT id FROM exercises WHERE name = ?", (data_log.exercise_name,)
         )
-        self._connection.commit()
+        exercise_id = self._cursor.fetchone()
 
-    def delete_exercise(self, category: str, exercise: str):
-        self._cursor.execute(
-            """
-            DELETE FROM exercises WHERE name=?,
-            (SELECT id FROM exercise_category WHERE name=?);""",
-            (exercise, category),
-        )
-        self._connection.commit()
+        if not exercise_id:
+            self._logger.error(f"Exercise '{data_log.exercise_name}' does not exist.")
+            raise sqlite3.IntegrityError(
+                f"Exercise '{data_log.exercise_name}' does not exist."
+            )
 
-    def add_exercise_log(
-        self,
-        exercise: str,
-        reps: list[int] = [],
-        units: str = "quantity",
-        date: datetime | None = None,
-        weight: int = 0,
-    ):
-        training_date = self._convert_date_to_iso(date)
-        total = sum(reps)
-        sets = int(len(reps))
-        json_reps = json.dumps(reps)
+        try:
+            self._cursor.execute(
+                """
+                INSERT INTO exercise_log (exercise_id, training_date, sets, reps, total, weight)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    exercise_id[0],
+                    training_date,
+                    sets,
+                    json_reps,
+                    total,
+                    data_log.weight,
+                ),
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
 
-        self._cursor.execute(
-            """
-            INSERT INTO exercise_log (exercise_id, training_date, sets, reps, total, units, weight)
-            VALUES (
-            (SELECT id FROM exercises WHERE name = ?),
-            ?, ?, ?, ?, ?, ?);""",
-            (exercise, training_date, sets, json_reps, total, units, weight),
-        )
-        self._connection.commit()
+    def delete_exercise_log(self, log_id: int) -> None:
+        try:
+            self._cursor.execute("DELETE FROM exercise_log WHERE id=?;", (log_id,))
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
 
-    def delete_exercise_log(self, id: int):
-        self._cursor.execute("DELETE FROM exercise_log WHERE id=?;", (id,))
-        self._connection.commit()
+    def set_weight(self, log_id: int, weight: str) -> None:
+        try:
+            self._cursor.execute(
+                "UPDATE exercise_log SET weight=? WHERE id=?;", (weight, log_id)
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
 
-    def set_date(self, id: int, date: datetime | None = None):
-        training_date = self._convert_date_to_iso(date)
-        self._cursor.execute(
-            "UPDATE exercise_log SET training_date=? WHERE id=?;", (training_date, id)
-        )
-        self._connection.commit()
+    def set_reps(self, log_id: int, reps: str) -> None:
+        json_reps, total, sets = self._process_reps_data(reps)
+        try:
+            self._cursor.execute(
+                "UPDATE exercise_log SET reps=?, total=?, sets=? WHERE id=?;",
+                (json_reps, total, sets, log_id),
+            )
+            self._connection.commit()
+        except sqlite3.Error as e:
+            self._logger.error(f"Database error: {e}")
+            self._connection.rollback()
 
-    def set_weight(self, id: int, weight: int):
-        self._cursor.execute(
-            "UPDATE exercise_log SET weight=? WHERE id=?;", (weight, id)
-        )
-        self._connection.commit()
-
-    def set_reps(self, id: int, reps: list[int]):
-        json_reps = json.dumps(reps)
-        total = sum(reps)
-        sets = int(len(reps))
-        self._cursor.execute(
-            "UPDATE exercise_log SET reps=?, total=?, sets=? WHERE id=?;",
-            (json_reps, total, sets, id),
-        )
-        self._connection.commit()
-
-    def set_units(self, id: int, units: str = "quantity"):
-        self._cursor.execute("UPDATE exercise_log SET units=? WHERE id=?;", (units, id))
-        self._connection.commit()
-
-    def set_data(self, id: int, reps: list[int], date: datetime | None = None):
-        self.set_reps(id, reps)
-        self.set_date(id, date)
-
-    def destroy(self):
+    def destroy(self) -> None:
         if self._connection:
             self._connection.close()
 
-    def _convert_date_to_iso(self, date: datetime | None):
+    def _process_reps_data(self, reps: str) -> Tuple[str, int, int]:
+        import json
+        reps_list = self._str2list(reps)
+        total = sum(reps_list)
+        sets = len(reps_list) if len(reps_list) else 1
+        json_reps = json.dumps(reps_list)
+        return (json_reps, total, sets)
+
+    def _convert_date_to_iso(self, date: Optional[datetime]) -> str:
         if date is None:
             date = datetime.now()
         return date.isoformat()
 
-    def _connect_to_database(self, db_path):
+    def _connect_to_database(self, db_path) -> None:
         try:
             self._connection = sqlite3.connect(db_path)
             self._cursor = self._connection.cursor()
@@ -254,13 +301,45 @@ class SQLiteRepository(IRepository):
         if not self._cursor.fetchall():
             self._load_default_data()
 
-    def _load_default_data(self):
+    def _str2list(self, s: str) -> List:
+        return [int(x.strip()) for x in s.strip("[]").split(",") if x.strip().isdigit()]
+
+    def _map_to_data_log(self, logs: List[Any]) -> Generator[DataLog, None, None]:
+
+        for row in logs:
+            # Each row is expected to have eight elements:
+            # (id, exercise_id, training_date, sets, reps, total, weight, exercise_name)
+            id, exercise_id, training_date, sets, reps, total, weight, exercise_name = (
+                row
+            )
+
+            import json
+
+            try:
+                reps_list = json.loads(reps)
+            except json.JSONDecodeError:
+                reps_list = [0]
+
+            yield DataLog(
+                id=id,
+                exercise_id=exercise_id,
+                training_date=training_date,
+                sets=sets,
+                reps=reps_list,
+                total=total,
+                weight=weight,
+                exercise_name=exercise_name,
+            )
+
+    def _load_default_data(self) -> None:
         self._load_tables()
         self._load_exercises()
 
-    def _load_tables(self):
+    def _load_tables(self) -> None:
         self._cursor.executescript(
             """
+            PRAGMA foreign_keys = ON;
+
             CREATE TABLE IF NOT EXISTS exercise_category (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
@@ -270,6 +349,7 @@ class SQLiteRepository(IRepository):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 category_id INTEGER NOT NULL,
+                units TEXT,
                 FOREIGN KEY (category_id) REFERENCES exercise_category(id)
             );
             
@@ -280,48 +360,57 @@ class SQLiteRepository(IRepository):
                 sets INTEGER NOT NULL,
                 reps TEXT,
                 total INTEGER,
-                units TEXT,
-                weight REAL,
+                weight TEXT,
                 FOREIGN KEY (exercise_id) REFERENCES exercises(id)
             );
         """
         )
         self._connection.commit()
 
-    def _load_exercises(self):
+    def _load_exercises(self) -> None:
         default_data = {
             "Push": [
-                "Push-ups",
-                "Declined push-ups",
-                "Elevated pike push-ups",
-                "One arm inclined push-ups",
+                ("Push-ups", "-"),
+                ("Declined push-ups", "-"),
+                ("Elevated pike push-ups", "-"),
+                ("One arm inclined push-ups", "-"),
             ],
-            "Pull": ["Chin-ups", "Pull-ups", "One arm hold"],
-            "Legs": ["Squats", "Bulgarian squats", "One leg squats"],
-            "Core": ["Plank", "Dragon-flag", "Hollow body hold"],
-            "Dips": ["Dips", "Single bar dips"],
-            "Inversions": ["Headstand", "Headstand advanced"],
+            "Pull": [("Chin-ups", "-"), ("Pull-ups", "-"), ("One arm hold", "seconds")],
+            "Legs": [
+                ("Squats", "-"),
+                ("Bulgarian squats", "-"),
+                ("One leg squats", "-"),
+            ],
+            "Core": [
+                ("Plank", "seconds"),
+                ("Dragon-flag", "seconds"),
+                ("Hollow body hold", "seconds"),
+            ],
+            "Dips": [("Dips", "-"), ("Single bar dips", "-")],
+            "Inversions": [("Headstand", "seconds"), ("Headstand advanced", "seconds")],
             "Handstand": [
-                "Handstand",
-                "Handstand push-ups",
-                "Tuck handstand",
-                "Straddle handstand",
-                "One arm handstand",
-                "Wall handstand shoulder taps",
+                ("Handstand", "seconds"),
+                ("Handstand push-ups", "-"),
+                ("Tuck handstand", "seconds"),
+                ("Straddle handstand", "seconds"),
+                ("One arm handstand", "seconds"),
+                ("Wall handstand shoulder taps", "-"),
             ],
             "Lever": [
-                "Tuck front lever rises",
-                "Advance tuck front lever rises",
-                "Straddle lever rises",
-                "Frond lever rises",
-                "Tuck front lever hold",
-                "Advance tuck front lever hold",
-                "Straddle front lever hold",
-                "Front lever hold",
+                ("Tuck front lever rises", "-"),
+                ("Advance tuck front lever rises", "-"),
+                ("Straddle lever rises", "-"),
+                ("Frond lever rises", "-"),
+                ("Tuck front lever hold", "seconds"),
+                ("Advance tuck front lever hold", "seconds"),
+                ("Straddle front lever hold", "seconds"),
+                ("Front lever hold", "seconds"),
             ],
         }
 
-        for category, exercises in default_data.items():
-            for exercise in exercises:
-                self.add_exercise(category, exercise)
+        for cat_name, exercises in default_data.items():
+            for e in exercises:
+                self.add_exercise(
+                    Category(name=cat_name), Exercise(name=e[0], units=e[1])
+                )
         self._connection.commit()
