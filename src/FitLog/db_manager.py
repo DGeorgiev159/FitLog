@@ -2,8 +2,7 @@ from dataclasses import dataclass
 import sqlite3
 import logging
 from datetime import datetime
-import json
-from typing import Optional
+from typing import Optional, List, Tuple, Any, Generator
 
 from abc import ABC, abstractmethod
 
