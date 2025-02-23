@@ -393,69 +393,52 @@ class TrainingApp(toga.App):
 
         context = self.canvas.context
         width, height = self.main_window.size
-        c_margin_x = 40
-        c_margin_y_top = 30
-        c_margin_y_bottom = 130
-
+        c_margin_x, c_margin_y_top, c_margin_y_bottom = 40, 30, 130
         coords_origin = (c_margin_x, height - c_margin_y_bottom)
-
-        graph_line_x_coords = (width - c_margin_x, height - c_margin_y_bottom)
-        graph_line_y_coords = (c_margin_x, c_margin_y_top)
-        grid_lines = len(x_data)
-
-        # Margin between data points
-        margin_data_x = int((width - 3 * c_margin_x) / grid_lines)
-        margin_lines_y = int((height - c_margin_y_top - c_margin_y_bottom) / 5)
-
+        
+        # Define grid and point margins
+        margin_data_x = (width - 3 * c_margin_x) / len(x_data)
+        margin_lines_y = (height - c_margin_y_top - c_margin_y_bottom) / 5
         initial_margin_data_x = c_margin_x + 20
-        initial_margin_data_y = c_margin_y_bottom + 20
-
+        data_margin_top, data_margin_bottom = c_margin_y_top + 15, height - c_margin_y_bottom - 15
+        
         # Get min/max values for scaling
-        max_total = max(y_data) + 10
-        min_total = min(y_data) - 5
+        min_total, max_total = min(y_data) - 5, max(y_data) + 10
+        total_range = max_total - min_total
 
         # Draw graph lines X & Y axis
         context.line_width = 2
-        context.move_to(graph_line_x_coords[0], graph_line_x_coords[1])
+        context.move_to(width - c_margin_x, height - c_margin_y_bottom)
         context.line_to(coords_origin[0], coords_origin[1])  # Y-axis
-        context.line_to(graph_line_y_coords[0], graph_line_y_coords[1])  # X-axis
+        context.line_to(c_margin_x, c_margin_y_top)  # X-axis
         context.stroke(color="black")
 
-        # Draw vertical grid lines
-        x_lines_pos = []
-        context.line_width = 1
-        for i in range(grid_lines):
-            x = i * margin_data_x + initial_margin_data_x
+        # Draw grid lines (vertical & horizontal)
+        x_lines_pos = [i * margin_data_x + initial_margin_data_x for i in range(len(x_data))]
+        for x in x_lines_pos:
             context.move_to(x, c_margin_y_top + 10)
             context.line_to(x, height - c_margin_y_bottom)
             context.stroke(color=GRAY)
-            x_lines_pos.append(x)
 
-        # Draw horizontal grid lines
         for j in range(5):
             y = c_margin_y_top + j * margin_lines_y + 15
             context.move_to(c_margin_x, y)
             context.line_to(width - c_margin_x - 10, y)
             context.stroke(color=GRAY)
 
-        # Bound for data point to be in the graph
-        data_margin_top = c_margin_y_top + 15
-        data_margin_bottom = height - c_margin_y_bottom - 15
-
-        # Draw points
-        total_range = max_total - min_total
-        points_coords = []
-        for i in range(len(y_data)):
-            y = (y_data[i] - min_total) / float(total_range)  # 0...1 range
-            y = y * data_margin_bottom + data_margin_top
-            context.arc(x_lines_pos[i], y, 5, 0, 360)
+        # Draw points and connecting lines
+        points_coords = [
+            [x, (y - min_total) / total_range * data_margin_bottom + data_margin_top]
+            for x, y in zip(x_lines_pos, y_data)
+        ]
+        
+        for x, y in points_coords:
+            context.arc(x, y, 5, 0, 360)
             context.fill(color=BLUE)
-            points_coords.append([x_lines_pos[i], y])
 
-        # Draw lines connecting the dots
         context.move_to(points_coords[0][0], points_coords[0][1])
-        for i in range(1, len(y_data)):
-            context.line_to(points_coords[i][0], points_coords[i][1])
+        for x, y in points_coords[1:]:
+            context.line_to(x, y)
 
         context.stroke(color=BLUE)
 
